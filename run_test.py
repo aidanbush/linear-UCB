@@ -18,7 +18,13 @@ MAX_STEPS = 10000
 EPISODIC="episodic"
 CONTINUOUS="continuous"
 
-def runTest(numRuns, numEpisodes, agent, env, parameters, testParams, report=False):
+def runTest(numRuns, numEpisodes, agent, env, parameters, testParams, report=False, seed=None):
+    if seed == None:
+        seed = int(time.time() % 10000 * 1000)
+
+    # seed np
+    np.random.seed(int(time.time() % 10000 * 1000))
+
     stepsData = []
     stepsMeans = np.zeros(numEpisodes)
     stepsStdev = np.zeros(numEpisodes)
@@ -32,7 +38,7 @@ def runTest(numRuns, numEpisodes, agent, env, parameters, testParams, report=Fal
     regretsStdev = np.zeros(numEpisodes)
 
     for i in range(numRuns):
-        steps, returns, regrets = runAgent(numEpisodes, agent, env, parameters, testParams, report=report)
+        steps, returns, regrets = runAgent(numEpisodes, agent, env, parameters, testParams, report=report, seed=seed+i*numEpisodes)
         if report:
             print("Run", i)
         stepsData.append(steps)
@@ -63,12 +69,12 @@ def runTest(numRuns, numEpisodes, agent, env, parameters, testParams, report=Fal
 
     return stepsMeans, stepsStdev, returnsMeans, returnsStdev, regretsMeans, regretsStdev
 
-def runAgent(numEpisodes, agentClass, envClass, parameters, testParams={"maxSteps":MAX_STEPS}, report=False):
-    # seed np
-    np.random.seed(int(time.time() % 10000 * 1000))
+def runAgent(numEpisodes, agentClass, envClass, parameters, testParams={"maxSteps":MAX_STEPS}, report=False, seed=None):
+    if seed == None:
+        seed = int(time.time() % 10000 * 1000)
 
     # create env
-    env = envClass()
+    env = envClass(seed)
     parameters.update(env.agentParams())
 
     # create agent
@@ -91,79 +97,9 @@ def runAgent(numEpisodes, agentClass, envClass, parameters, testParams={"maxStep
         regrets.append(glue.regret)
     #agent.printValues() # for testing value and action value values
     #agent.printWeights()
-    #plotActions(agent, env, 40)
 
 
     return steps, returns, regrets
-
-def plotActions(agent, environment, resolution):
-    stateRanges = environment.agentParams()["stateFormat"]
-    # if not continuous min is 0
-    if type(stateRanges[0]) == int:
-        stateRanges = [(0, s) for s in stateRanges]
-
-    numStates = len(stateRanges)
-    numActions = environment.agentParams()["numActions"]
-
-    actionColours = plt.cm.get_cmap("hsv", numActions+1)
-    nonActionColour = (0.0, 0.0, 0.0, 1.0)
-
-    print(stateRanges)
-
-    # assume stateRange >= 2
-    if numStates < 2:
-        # plot line
-        return
-
-    # create figure with len(stateRange) * len(stateRange) plots
-    fig, ax = plt.subplots(numStates, numStates)
-
-    # for each pair of environment states
-    stateSampleIterations = 200
-    for s1 in range(numStates):
-        print("s1",s1)
-        for s2 in range(numStates):
-            print("s2",s2)
-            s1Min = stateRanges[s1][0]
-            s1Max = stateRanges[s1][1]
-            s2Min = stateRanges[s2][0]
-            s2Max = stateRanges[s2][1]
-
-            imshowList = np.zeros((resolution+1, resolution+1, 4))
-            # loop through values
-            for i in range(resolution+1):
-                if s1 == s2:
-                    break
-                for j in range(resolution+1):
-                    state = [None for _ in range(numStates)]
-
-                    s1Val = s1Min + (i/resolution)*(s1Max-s1Min)
-                    s2Val = s2Min + (j/resolution)*(s2Max-s2Min)
-
-                    state[s1] = s1Val
-                    state[s2] = s2Val
-
-                    action = agent.greedyAction(state, stateSampleIterations)
-                    colour = nonActionColour
-
-                    if action != agent.nullAction:# unupdated
-                        colour = actionColours(action)
-
-                    # copy colour
-                    for imI in range(4):
-                        imshowList[i][j][imI] = colour[imI]
-                    #print("[{:.2f},{:.2f}]".format(state[0],state[1]), end=",")
-            #print()
-            ax[s1][s2].imshow(imshowList)
-            ax[s1][s2].xaxis.tick_top()
-            ax[s1][s2].xaxis.set_label_position('top')
-
-            ax[s1][s2].set_xlabel(s1)
-            ax[s1][s2].set_ylabel(s2)
-
-    lines = [Line2D([0], [0], color=colour, lw=4) for colour in [nonActionColour]+[actionColours(i) for i in range(numActions)]]
-    ax[0][0].legend(lines, ["none"] + list(range(numActions)))
-    plt.show()
 
 def plotData(data, labels):
     # plot steps
@@ -208,6 +144,8 @@ def plotData(data, labels):
     #plt.savefig("regret_plot.pdf")
 
 def parameterSweep(numRuns, numEpisodes, agent, env, agentParams, testParams, numTests, grid=True):
+    seed = int(time.time() % 10000 * 1000)
+
     if grid:
         # GRID sweep
         # create dictionary of ranges
@@ -235,7 +173,7 @@ def parameterSweep(numRuns, numEpisodes, agent, env, agentParams, testParams, nu
             labels.append(agent.__name__ + " " + str(agentSweepParams))
 
             print("Sweep:", len(labels), "/", numTests**len(keys), labels[-1])
-            data.append(runTest(numRuns, numEpisodes, agent, env, agentSweepParams, testParams, report=True))
+            data.append(runTest(numRuns, numEpisodes, agent, env, agentSweepParams, testParams, report=True, seed=seed))
 
     else:
         # random sweep
@@ -259,16 +197,26 @@ def parameterSweep(numRuns, numEpisodes, agent, env, agentParams, testParams, nu
             labels.append(agent.__name__ + " " + str(agentSweepParams))
 
             print("Sweep:", len(labels), "/", numTests, labels[-1])
-            data.append(runTest(numRuns, numEpisodes, agent, env, agentSweepParams, testParams, report=True))
+            data.append(runTest(numRuns, numEpisodes, agent, env, agentSweepParams, testParams, report=True, seed=seed))
 
     # plot
     plotData(data, labels)
 
 def basicTest():
-    numRuns = 10
+    numRuns = 30
     numEpisodes = 12000
-    agents = [a.LinUCB]#[a.LinUCB, a.LinUCB, a.LinUCB]
-    parameters = [{"regularizer": 1, "delta": 1.0}, {"regularizer": 2, "delta": 1.0}, {"regularizer": .5, "delta": 1.0}]#[{"regularizer": 1, "delta": 1.0}, {"regularizer": 1, "delta": .5}, {"regularizer": 1, "delta": .05}, ]
+    #agents = [a.Random]
+    #parameters = [{}]
+    #agents = [a.BestAction, a.LinUCB]
+    #parameters = [{}, {"regularizer": 1, "delta": 1.0}]
+    #agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB, a.LinUCB]
+    #parameters = [{}, {"regularizer": 2, "delta": 1.0}, {"regularizer": 1, "delta": 1.0}, {"regularizer": .5, "delta": 1.0}, {"regularizer": .1, "delta": 1.0}]
+    # no difference between regularizers
+    agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB, a.LinUCB]
+    parameters = [{}, {"regularizer": 1, "delta": 1.0}, {"regularizer": 1, "delta": .5}, {"regularizer": 1, "delta": .1}, {"regularizer": 1, "delta": .05}]
+    #agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB]
+    #agents = [a.BestAction, a.LinUCB]
+    #parameters = [{}, {"regularizer": 1, "delta": 1}]
     env = e.randomContextualBandit
     #parameters = {"gamma": 1, "alpha": 0.1, "epsilon": 0.1, "n_steps": 5}
     testParams = {"algType": EPISODIC, "maxSteps":10}
@@ -276,13 +224,15 @@ def basicTest():
     data = []
     labels = []
 
+    seed = int(time.time() % 10000 * 1000)
+
     for i in range(len(agents)):
         labels.append(agents[i].__name__ + " " + str(i))
         agent = agents[i]
         params = parameters
         if isinstance(parameters, list):
             params = parameters[i]
-        data.append(runTest(numRuns, numEpisodes, agent, env, params, testParams, report=True))
+        data.append(runTest(numRuns, numEpisodes, agent, env, params, testParams, report=True, seed=seed))
 
     plotData(data, labels)
 

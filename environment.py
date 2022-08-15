@@ -13,6 +13,8 @@ class BaseEnvironment:
         raise NotImplementedError('Expected `step` to be implemented')
 
 class randomContextualBandit(BaseEnvironment):
+    generator = None
+
     numContexts = None
     numArms = None
 
@@ -22,48 +24,57 @@ class randomContextualBandit(BaseEnvironment):
 
     t = None
 
-    def __init__(self):
-        self.numContexts = 2
-        self.numArms = 3
-        self.means = np.random.rand(self.numContexts, self.numArms)
-        self.stddev = np.random.rand(self.numContexts, self.numArms)/10
-        #self.means = np.array([[0,.5,1],[.5,1,0]])
-        #self.stddev = np.array([[.2,.2,.2],[.2,.2,.2]])
-
-        print(self.means, "\n", self.stddev)
+    def __init__(self, seed):
         self.t = 0
+
+        self.generator = np.random.default_rng(seed)
+
+        self.numContexts = 10
+        self.numArms = 5
+
+        self.randomize_env()
 
     def best_reward(self, context):
         return np.max(self.means[np.argmax(context)])
 
+    def best_action(self, context):
+        return np.argmax(self.means[np.argmax(context)])
+
+    def gen_context(self):
+        return self.generator.integers(self.numContexts)
+
+    def randomize_env(self):
+        self.means = self.generator.random((self.numContexts, self.numArms))*2
+        self.stddev = self.generator.random((self.numContexts, self.numArms))/10*2
+
     def start(self):
-        self.currentContext = np.random.randint(self.numContexts)
+        self.currentContext = self.gen_context()
 
         context = np.zeros(self.numContexts)
         context[self.currentContext] = 1
 
-        return context
+        return (context, self.best_action(context))
 
     def step(self, action):
         self.t += 1
 
-        if self.t % 20000 == 0 and self.t <= 40000:
+        if self.t % 15000 == 0 and self.t <= 75000:
             print("change", self.t)
-            self.means = np.random.rand(self.numContexts, self.numArms)*2
-            self.stddev = np.random.rand(self.numContexts, self.numArms)/10*2
             # new mean and stddev
+            self.randomize_env()
+            print(self.means)
 
         mean = self.means[self.currentContext, action]
         stddev = self.stddev[self.currentContext, action]
-        reward = np.random.normal(mean, stddev)
+        reward = self.generator.normal(mean, stddev)
         #reward = self.means[self.currentContext, action]
 
-        self.currentContext = np.random.randint(self.numContexts)
+        self.currentContext = self.gen_context()
 
         context = np.zeros(self.numContexts)
         context[self.currentContext] = 1
 
-        return (reward, context, False)
+        return (reward, context, False, self.best_action(context))
 
     def agentParams(self):
         return {"numActions": self.numArms, "observationDims": self.numContexts}

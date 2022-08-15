@@ -16,6 +16,37 @@ class BaseAgent:
     def end(self, reward: float) -> None:
         raise NotImplementedError('Expected `end` to be implemented')
 
+class BestAction(BaseAgent):
+    numActions = None
+
+    def __init__(self, parameters):
+        self.numActions = parameters["numActions"]
+
+    def start(self, observation, bestAction):
+        return bestAction
+
+    def step(self, reward, observation, bestAction):
+        return bestAction
+
+    def end(self, reward):
+        pass
+
+
+class Random(BaseAgent):
+    numActions = None
+
+    def __init__(self, parameters):
+        self.numActions = parameters["numActions"]
+
+    def start(self, observation, bestAction):
+        return np.random.randint(self.numActions)
+
+    def step(self, reward, observation, bestAction):
+        return np.random.randint(self.numActions)
+
+    def end(self, reward):
+        pass
+
 
 class LinUCB(BaseAgent):
     # c context dimensions
@@ -49,16 +80,19 @@ class LinUCB(BaseAgent):
         self.delta = parameters["delta"]
         self.t = 1
 
-    def start(self, observation):
+    def start(self, observation, bestAction):
         return self.selectAction(observation)
 
-    def step(self, reward, observation):
+    def step(self, reward, observation, bestAction):
         self.t += 1
 
         self.updateTheta(reward)
 
-        if (self.t + 1) % (250) == 0:
-            print(self.theta)
+        if (self.t + 1) % (1000*10) == 0:
+            pass
+            #print(self.theta)
+            #print(self.V)
+            #print(np.linalg.inv(self.V))
 
         return self.selectAction(observation)
 
@@ -100,3 +134,5 @@ class LinUCB(BaseAgent):
         self.b = self.b + reward * self.oldAction
         # theta = V^inverse * b
         self.theta = np.linalg.inv(self.V).dot(self.b)
+
+#class LinUCBTorch(BaseAgent):

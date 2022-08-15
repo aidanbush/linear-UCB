@@ -18,13 +18,13 @@ class RlGlue:
         self.num_steps = 0
         self.total_reward = 0
 
-        s = self.environment.start()
-        self.last_action = self.agent.start(s)
+        s, best_action = self.environment.start()
+        self.last_action = self.agent.start(s, best_action)
 
         return (s, self.last_action)
 
     def step(self):
-        (reward, s, term) = self.environment.step(self.last_action)
+        (reward, s, term, best_action) = self.environment.step(self.last_action)
 
         self.total_reward += reward
         self.regret = self.environment.best_reward(s) - reward
@@ -36,7 +36,7 @@ class RlGlue:
             self.agent.end(reward)
             rsat = (reward, s, None, term)
         else:
-            self.last_action = self.agent.step(reward, s)
+            self.last_action = self.agent.step(reward, s, best_action)
             rsat = (reward, s, self.last_action, term)
 
         return rsat
