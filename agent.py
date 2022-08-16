@@ -2,6 +2,7 @@ from abc import abstractmethod
 from typing import Any
 
 import numpy as np
+import torch
 
 class BaseAgent:
     @abstractmethod
@@ -110,11 +111,12 @@ class LinUCB(BaseAgent):
 
         # compute UCB
         ucb = np.zeros(self.numActions)
+        invV = np.linalg.inv(self.V)
         for action in range(self.numActions):
             # block out non action elements
             actionContext = context * [1 if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)]
             # ucb = transpose(context) dot theta + beta root(transpose(context) dot V^inverse dot context)
-            ucb[action] = actionContext.dot(self.theta) + beta * np.sqrt(actionContext.dot(np.linalg.inv(self.V)).dot(actionContext))
+            ucb[action] = actionContext.dot(self.theta) + beta * np.sqrt(actionContext.dot(invV).dot(actionContext))
             # wrong should add a vector since I am calculating all UCB at the same time -- action vector (context here) is wrong since it should be different per action
         # action = argmax(ucb)
         action = np.random.choice(np.flatnonzero(ucb==ucb.max()))
@@ -134,5 +136,93 @@ class LinUCB(BaseAgent):
         self.b = self.b + reward * self.oldAction
         # theta = V^inverse * b
         self.theta = np.linalg.inv(self.V).dot(self.b)
+class LinUCBTorch(BaseAgent):
+    reg = None # regularizer
 
-#class LinUCBTorch(BaseAgent):
+    V = None
+    observeDims = None
+    numActions = None
+
+    oldAction = None
+
+    theta = None # vector c*a in length
+
+    t = None
+
+    def __init__(self, parameters):
+        self.observeDims = parameters["observationDims"]
+        self.numActions = parameters["numActions"]
+        self.reg = parameters["regularizer"]
+
+        # TODO move to start?
+        #self.theta = np.random.rand(self.observeDims * self.numActions)
+        self.theta = torch.rand(self.observeDims * self.numActions)
+        #self.V = np.identity(self.observeDims * self.numActions) * self.reg
+        self.V = torch.eye(self.observeDims * self.numActions) * self.reg
+        #self.b = np.zeros(self.observeDims * self.numActions)
+        self.b = torch.zeros(self.observeDims * self.numActions)
+
+        self.delta = parameters["delta"]
+        self.t = 1
+
+    def start(self, observation, bestAction):
+        observation = torch.tensor(observation).float()
+        return self.selectAction(observation)
+
+    def step(self, reward, observation, bestAction):
+        observation = torch.tensor(observation).float()
+        self.t += 1
+
+        self.updateTheta(reward)
+
+        if (self.t + 1) % (1000*10) == 0:
+            pass
+            #print(self.theta)
+            #print(self.V)
+            #print(np.linalg.inv(self.V))
+
+        return self.selectAction(observation)
+
+    def end(self, reward):
+        self.updateTheta(reward)
+
+    def selectAction(self, observation):
+        # select new action
+        # observation is a vertical vector of size c
+        # get action set - create context from observations - just a vector
+        #context = np.concatenate([observation for _ in range(self.numActions)])
+        context = torch.cat([observation for _ in range(self.numActions)])
+        # beta = root(lambda) + root(2 log(1 / delta) + d log(1 + (t - 1) / lambda * d))
+        #beta = np.sqrt(self.reg) + np.sqrt(2 * np.log(1/self.delta) + self.numActions * np.log(1 + (self.t-1)/(self.reg * self.numActions)))
+        beta = np.sqrt(self.reg) + np.sqrt(2 * np.log(1/self.delta) + self.numActions * np.log(1+(self.t-1)/(self.reg * self.numActions)))
+
+        # compute UCB
+        ucb = torch.zeros(self.numActions)
+        invV = torch.linalg.inv(self.V)
+        for action in range(self.numActions):
+            # block out non action elements
+            #actionContext = context * [1 if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)]
+            actionContext = context * torch.tensor([1. if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)])
+            # ucb = transpose(context) dot theta + beta root(transpose(context) dot V^inverse dot context)
+            #ucb[action] = actionContext.dot(self.theta) + beta * np.sqrt(actionContext.dot(np.linalg.inv(self.V)).dot(actionContext))
+            ucb[action] = actionContext.dot(self.theta) + beta * torch.sqrt(torch.matmul(actionContext, invV).dot(actionContext))
+            # wrong should add a vector since I am calculating all UCB at the same time -- action vector (context here) is wrong since it should be different per action
+        # action = argmax(ucb)
+        #action = np.random.choice(np.flatnonzero(ucb==ucb.max()))
+        action = np.random.choice(torch.nonzero(ucb==ucb.max()).reshape(-1))
+        actionContext = context * torch.tensor([1. if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)])
+        # oldAction = one hot vector
+        self.oldAction = actionContext
+        #print("action o:", actionContext)
+        # return action
+        return action
+
+    def updateTheta(self, reward):
+        #print("action u:", self.oldAction, reward, "\n")
+        # update old action
+        # V = V + old_action outer product transpose(old_action)
+        self.V = self.V + torch.outer(self.oldAction, self.oldAction)
+        # b = b + reward * old_action
+        self.b = self.b + reward * self.oldAction
+        # theta = V^inverse * b
+        self.theta = torch.matmul(torch.linalg.inv(self.V), (self.b))

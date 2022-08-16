@@ -207,13 +207,13 @@ def basicTest():
     numEpisodes = 12000
     #agents = [a.Random]
     #parameters = [{}]
-    #agents = [a.BestAction, a.LinUCB]
-    #parameters = [{}, {"regularizer": 1, "delta": 1.0}]
+    agents = [a.LinUCBTorch, a.LinUCB]
+    parameters = [{"regularizer": 1, "delta": 1.0}, {"regularizer": 1, "delta": 1.0}]
     #agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB, a.LinUCB]
     #parameters = [{}, {"regularizer": 2, "delta": 1.0}, {"regularizer": 1, "delta": 1.0}, {"regularizer": .5, "delta": 1.0}, {"regularizer": .1, "delta": 1.0}]
     # no difference between regularizers
-    agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB, a.LinUCB]
-    parameters = [{}, {"regularizer": 1, "delta": 1.0}, {"regularizer": 1, "delta": .5}, {"regularizer": 1, "delta": .1}, {"regularizer": 1, "delta": .05}]
+    #agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB, a.LinUCB]
+    #parameters = [{}, {"regularizer": 1, "delta": 1.0}, {"regularizer": 1, "delta": .5}, {"regularizer": 1, "delta": .1}, {"regularizer": 1, "delta": .05}]
     #agents = [a.BestAction, a.LinUCB, a.LinUCB, a.LinUCB]
     #agents = [a.BestAction, a.LinUCB]
     #parameters = [{}, {"regularizer": 1, "delta": 1}]
