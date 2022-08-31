@@ -136,8 +136,10 @@ class LinUCB(BaseAgent):
         self.b = self.b + reward * self.oldAction
         # theta = V^inverse * b
         self.theta = np.linalg.inv(self.V).dot(self.b)
+
 class LinUCBTorch(BaseAgent):
     reg = None # regularizer
+    delta = None
 
     V = None
     observeDims = None
@@ -201,14 +203,11 @@ class LinUCBTorch(BaseAgent):
         invV = torch.linalg.inv(self.V)
         for action in range(self.numActions):
             # block out non action elements
-            #actionContext = context * [1 if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)]
             actionContext = context * torch.tensor([1. if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)])
             # ucb = transpose(context) dot theta + beta root(transpose(context) dot V^inverse dot context)
-            #ucb[action] = actionContext.dot(self.theta) + beta * np.sqrt(actionContext.dot(np.linalg.inv(self.V)).dot(actionContext))
             ucb[action] = actionContext.dot(self.theta) + beta * torch.sqrt(torch.matmul(actionContext, invV).dot(actionContext))
             # wrong should add a vector since I am calculating all UCB at the same time -- action vector (context here) is wrong since it should be different per action
         # action = argmax(ucb)
-        #action = np.random.choice(np.flatnonzero(ucb==ucb.max()))
         action = np.random.choice(torch.nonzero(ucb==ucb.max()).reshape(-1))
         actionContext = context * torch.tensor([1. if i // self.observeDims == action else 0 for i in range(self.observeDims * self.numActions)])
         # oldAction = one hot vector
