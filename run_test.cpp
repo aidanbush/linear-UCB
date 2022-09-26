@@ -109,7 +109,7 @@ void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
 
     for (int i = 0; i < numRuns; i++) {
         fprintf(stderr, "run: %d\n", i);
-        LinUCB agent = LinUCB(10, 5, 1, .1);
+        LinUCB agent = LinUCB(10, 5, 1, 1);
         RandomEnv env = RandomEnv(10, 5, seed + i);
 
         pair<vector<double>, vector<double>> runResults = runAgent(agent, env, numEpisodes, episodeLength);
