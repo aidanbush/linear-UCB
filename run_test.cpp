@@ -74,6 +74,14 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
     double epReturn = 0;
     double epRegret = 0;
 
+#ifdef SEPARATE_UPDATES
+    vector<int> actions;
+    for (int i = 0; i < env.getNumArms(); i++) {
+        if (i == 1)
+            actions.push_back(i);
+    }
+#endif /* SEPARATE_UPDATES */
+
     for (int i = 0; i < numEpisodes; i++) {
         fprintf(stderr, "episode %d\n", i);
         epReturn = 0;
@@ -86,7 +94,7 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
         int action;
         int prevAction;
 
-        action = agent.selectAction(context);
+        action = agent.selectAction(context, actions);
         prevAction = action;
         prevContext = context;
 #else /* SEPARATE_UPDATES */
@@ -101,7 +109,7 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
             // update agent with previous state and reward
             // select action
             agent.updateAgent(prevContext, prevAction, get<0>(envVals));
-            action = agent.selectAction(get<1>(envVals));
+            action = agent.selectAction(get<1>(envVals), actions);
 
             prevAction = action;
             prevContext = get<1>(envVals);

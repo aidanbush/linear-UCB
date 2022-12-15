@@ -14,7 +14,7 @@ class LinUCB {
 
 #ifdef SEPARATE_UPDATES
         void updateAgent(torch::Tensor observation, int action, double reward);
-        int selectAction(torch::Tensor observation);
+        int selectAction(torch::Tensor observation, vector<int> available_actions);
 #else /* SEPARATE_UPDATES */
         int start(torch::Tensor observation);
         int step(double reward, torch::Tensor observation);

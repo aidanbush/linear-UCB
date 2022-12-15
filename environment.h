@@ -14,6 +14,8 @@ class RandomEnv {
         torch::Tensor start();
         tuple<double, torch::Tensor, double> step(int action);
 
+        int getNumArms() { return numArms; }
+
     private:
         int currentContext;
         int timestep;
