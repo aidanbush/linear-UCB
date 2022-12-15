@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <utility>
 
+#include <vector>
+
 #include "linUCB.h"
 #include "environment.h"
 
@@ -130,8 +132,10 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
 }
 
 void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
-    LinUCB agent = LinUCB(10, 5, 1, .1, 0);
-    RandomEnv env = RandomEnv(10, 5, seed);
+    int num_actions = 4;
+    int num_states = 10;
+    LinUCB agent = LinUCB(num_states, num_actions, 1, .1, 0);
+    RandomEnv env = RandomEnv(num_states, num_actions, seed);
 
     // store data
     vector<vector<double>> returns;
@@ -151,9 +155,86 @@ void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
     writeResults(returns, regrets);
 }
 
-int main() {
+    /*
+    // break into 2 pieces
+    torch::Tensor ar1 = torch::arange(0,4);
+    torch::Tensor m1 = torch::index_select(torch::index_select(M, 0, ar1), 1, ar1);
+    torch::Tensor ar2 = torch::arange(0,4);
+    torch::Tensor m2 = torch::index_select(torch::index_select(M, 0, ar1), 1, ar1);
+    // calculate inverse
+    torch::Tensor m1_inv = torch::inverse(m1);
+    torch::Tensor m2_inv = torch::inverse(m2);
+    // stitch back together
+    torch::Tensor Mm_inv = torch::block_diag({m1_inv, m2_inv});
+    */
+/*
+int partitions = 4;
+vector<torch::Tensor> ar(partitions);
+
+torch::Tensor calculate_inverse(torch::Tensor t, int partitions) {
+    vector<torch::Tensor> tl(partitions); // list of tensors to rebuild
+
+    for (int i = 0; i < partitions; i++) {
+        tl[i] = torch::inverse(torch::index_select(torch::index_select(t, 0, ar[i]), 1, ar[i]));
+    }
+
+    return torch::block_diag(tl);
+}
+*/
+
+int main(int argc, char *argv[]) {
+    /*
+    int num_iter = atoi(argv[1]);
+    bool split = false;
+    if (argc > 2 && strcmp(argv[2], "-s") == 0) {
+        split = true;
+    }
+
+    int state_size = 25;
+
+    for (int i = 0; i < partitions; i++) {
+        ar[i] = torch::arange(i * state_size, (i+1) * state_size);
+    }
+
+    // create random tensor
+    torch::Tensor M = torch::block_diag({torch::randn({state_size, state_size}),
+            torch::randn({state_size, state_size}), torch::randn({state_size, state_size}),
+            torch::randn({state_size, state_size})});
+
+    if (split) {
+        printf("split iterations: %d\n", num_iter);
+        for (int i = 0; i < num_iter; i++) {
+            torch::Tensor M_inv = calculate_inverse(M, partitions);
+        }
+    } else {
+        printf("no split iterations: %d\n", num_iter);
+        for (int i = 0; i < num_iter; i++) {
+            torch::Tensor M_inv = torch::inverse(M);
+        }
+    }
+    // compare against inverse of original
+    //torch::Tensor M_inv = torch::inverse(M);
+
+    //cout << M << endl;
+    //cout << M_inv << endl;
+    return 0;
+    */
+
+    /*
+    torch::Tensor i = torch::eye(5);
+    torch::Tensor v = torch::ones(5);
+    v[4] = 5;
+
+    cout << i << endl;
+    cout << v << endl;
+    v = v* i;
+    cout << v << endl;
+
+    return 0;
+    */
+
     int numRuns = 5; //30;
-    int numEpisodes = 12000;
+    int numEpisodes = 5000;
     int episodeLength = 10;
     run_test(numRuns, numEpisodes, episodeLength, 382.4268);
 
