@@ -83,11 +83,33 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
 
         // run episode
         torch::Tensor context = env.start();
+#ifdef SEPARATE_UPDATES
+        torch::Tensor prevContext;
+        int action;
+        int prevAction;
+
+        action = agent.selectAction(context);
+        prevAction = action;
+        prevContext = context;
+#else /* SEPARATE_UPDATES */
         int action = agent.start(context);
+#endif /* SEPARATE_UPDATES */
 
         for (int j = 0; j < episodeLength; j++) { // TODO start at 0 or 1
+            // get reward for action, next state, and expected best reward
             tuple<double, torch::Tensor, double> envVals = env.step(action);
+
+#ifdef SEPARATE_UPDATES
+            // update agent with previous state and reward
+            // select action
+            agent.updateAgent(prevContext, prevAction, get<0>(envVals));
+            action = agent.selectAction(get<1>(envVals));
+
+            prevAction = action;
+            prevContext = get<1>(envVals);
+#else /* SEPARATE_UPDATES */
             action = agent.step(get<0>(envVals), get<1>(envVals));
+#endif /* SEPARATE_UPDATES */
 
             epReturn += get<0>(envVals);
             epRegret += get<2>(envVals) - get<0>(envVals);
@@ -102,8 +124,10 @@ pair<vector<double>, vector<double>> runAgent(LinUCB agent, RandomEnv env, int n
 }
 
 void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
-    LinUCB agent = LinUCB(10, 5, 1, .1);
-    RandomEnv env = RandomEnv(10, 5, seed);
+    int num_actions = 4;
+    int num_states = 10;
+    LinUCB agent = LinUCB(num_states, num_actions, 1, .1, 0);
+    RandomEnv env = RandomEnv(num_states, num_actions, seed);
 
     // store data
     vector<vector<double>> returns;
@@ -111,7 +135,7 @@ void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
 
     for (int i = 0; i < numRuns; i++) {
         fprintf(stderr, "run: %d\n", i);
-        LinUCB agent = LinUCB(10, 5, 1, .1);
+        LinUCB agent = LinUCB(10, 5, 1, 1, 0);
         RandomEnv env = RandomEnv(10, 5, seed + i);
 
         pair<vector<double>, vector<double>> runResults = runAgent(agent, env, numEpisodes, episodeLength);
@@ -201,8 +225,8 @@ int main(int argc, char *argv[]) {
     return 0;
     */
 
-    int numRuns = 30;
-    int numEpisodes = 12000;
+    int numRuns = 5; //30;
+    int numEpisodes = 5000;
     int episodeLength = 10;
     run_test(numRuns, numEpisodes, episodeLength, 382.4268);
 

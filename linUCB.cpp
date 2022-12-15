@@ -3,7 +3,7 @@
 
 using namespace std;
 
-LinUCB::LinUCB(int observeDims, int numActions, double regularizer, double delta) {
+LinUCB::LinUCB(int observeDims, int numActions, double regularizer, double delta, int seed) {
     this->observeDims = observeDims;
     this->numActions = numActions;
     this->regularizer = regularizer;
@@ -14,25 +14,44 @@ LinUCB::LinUCB(int observeDims, int numActions, double regularizer, double delta
     this->b = torch::zeros(this->observeDims * this->numActions);
 
     this->timestep = 1;
+
+    generator.seed(seed);
 }
 
+
+#ifdef SEPARATE_UPDATES
+void LinUCB::updateAgent(torch::Tensor observation, int action, double reward) {
+    this->timestep++;
+    torch::Tensor prevActionContext = createActionContext(observation, action);
+    updateTheta(prevActionContext, reward);
+}
+
+#else
+
 int LinUCB::start(torch::Tensor observation) {
-    return selectAction(observation);
+    int action = selectAction(observation);
+    this->oldActionContext = createActionContext(observation, action);
+
+    return action;
 }
 
 int LinUCB::step(double reward, torch::Tensor observation) {
     this->timestep++;
 
-    updateTheta(reward);
+    updateTheta(this->oldActionContext, reward);
 
-    return selectAction(observation);
+    int action = selectAction(observation);
+    this->oldActionContext = createActionContext(observation, action);
+
+    return action;
 }
 
 void LinUCB::end(double reward) {
     this->timestep++;
 
-    updateTheta(reward);
+    updateTheta(this->oldActionContext, reward);
 }
+#endif /* SEPARATE_UPDATES */
 
 int LinUCB::selectAction(torch::Tensor observation) {
     double beta = sqrt(this->regularizer) + sqrt(2 * log(1 / this->delta) + this->numActions *
@@ -48,20 +67,20 @@ int LinUCB::selectAction(torch::Tensor observation) {
     }
 
     // select highest ucb value
-    int action = 0;
+    // TODO ramdomly select equal actions
+    vector<int> actions = {0};
     double actionValue = ucb[0].item().to<double>();
     for (int i = 1; i < this->numActions; i++) {
         double tmpActionValue = ucb[i].item().to<double>();
         if (tmpActionValue > actionValue) {
-            action = i;
+            actions = {i};
             actionValue = tmpActionValue;
-        //} else if (ucb[i] == actionValue) {
+        } else if (tmpActionValue == actionValue) {
+            actions.push_back(i);
         }
     }
 
-    this->oldActionContext = createActionContext(observation, action);
-
-    return action;
+    return actions[generator() % actions.size()];
 }
 
 torch::Tensor LinUCB::createActionContext(torch::Tensor observation, int action) {
@@ -80,10 +99,10 @@ torch::Tensor LinUCB::createActionContext(torch::Tensor observation, int action)
     return actionContext;
 }
 
-void LinUCB::updateTheta(double reward) {
-    this->V = this->V + torch::outer(this->oldActionContext, this->oldActionContext);
+void LinUCB::updateTheta(torch::Tensor oldActionContext, double reward) {
+    this->V = this->V + torch::outer(oldActionContext, oldActionContext);
 
-    this->b = this->b + reward * this->oldActionContext;
+    this->b = this->b + reward * oldActionContext;
 
     this->theta = torch::matmul(torch::inverse(this->V), this->b);
 }
