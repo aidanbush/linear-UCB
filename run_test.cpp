@@ -167,9 +167,9 @@ void run_test(int numRuns, int numEpisodes, int episodeLength, double seed) {
     // stitch back together
     torch::Tensor Mm_inv = torch::block_diag({m1_inv, m2_inv});
     */
+
 /*
-int partitions = 4;
-vector<torch::Tensor> ar(partitions);
+vector<torch::Tensor> ar;
 
 torch::Tensor calculate_inverse(torch::Tensor t, int partitions) {
     vector<torch::Tensor> tl(partitions); // list of tensors to rebuild
@@ -180,31 +180,60 @@ torch::Tensor calculate_inverse(torch::Tensor t, int partitions) {
 
     return torch::block_diag(tl);
 }
+
+vector<torch::Tensor> calculate_vector_inverse(vector<torch::Tensor> t, int partitions) {
+    vector<torch::Tensor> tl(t.size());
+
+    for (int i = 0; i < partitions; i++) {
+        tl[i] = torch::inverse(t[i]);
+    }
+
+    return tl;
+}
 */
 
 int main(int argc, char *argv[]) {
     /*
-    int num_iter = atoi(argv[1]);
+    if (argc <= 4) {
+        printf("%s [-s|-d|-n] iters size partitions\n", argv[0]);
+        return 1;
+    }
+
     bool split = false;
-    if (argc > 2 && strcmp(argv[2], "-s") == 0) {
+    bool decompose = false;
+    if (strcmp(argv[1], "-s") == 0) {
         split = true;
+    } else if (strcmp(argv[1], "-d") == 0) {
+        decompose = true;
     }
 
-    int state_size = 25;
+    int num_iter = atoi(argv[2]);
+    int size = atoi(argv[3]);
+    int partitions = atoi(argv[4]);
 
-    for (int i = 0; i < partitions; i++) {
-        ar[i] = torch::arange(i * state_size, (i+1) * state_size);
-    }
+    int state_size = size / partitions;
 
     // create random tensor
-    torch::Tensor M = torch::block_diag({torch::randn({state_size, state_size}),
-            torch::randn({state_size, state_size}), torch::randn({state_size, state_size}),
-            torch::randn({state_size, state_size})});
+    vector<torch::Tensor> Ms;
+
+    for (int i = 0; i < partitions; i++) {
+        ar.push_back(torch::arange(i * state_size, (i+1) * state_size));
+        Ms.push_back(torch::randn({state_size, state_size}));
+    }
+
+    torch::Tensor M = torch::block_diag(Ms);
+
+    printf("size: %d, state size: %d, partitions: %d\n", size * partitions, state_size, partitions);
 
     if (split) {
         printf("split iterations: %d\n", num_iter);
         for (int i = 0; i < num_iter; i++) {
             torch::Tensor M_inv = calculate_inverse(M, partitions);
+        }
+    } else if (decompose) {
+        printf("decompose iterations: %d\n", num_iter);
+        for (int i = 0; i < num_iter; i++) {
+            vector<torch::Tensor> M_inv = calculate_vector_inverse(Ms, partitions);
         }
     } else {
         printf("no split iterations: %d\n", num_iter);
@@ -219,7 +248,6 @@ int main(int argc, char *argv[]) {
     //cout << M_inv << endl;
     return 0;
     */
-
     /*
     torch::Tensor i = torch::eye(5);
     torch::Tensor v = torch::ones(5);
